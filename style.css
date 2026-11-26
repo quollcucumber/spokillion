@@ -79,6 +79,9 @@ body { margin: 0; min-height: 100vh; }
 input#answer { width: 100%; font: inherit; font-size: 22px; padding: 12px 14px; border-radius: 12px; border: 2px solid var(--ink); margin-bottom: 12px; background: #fff; }
 input#answer:focus { outline: 3px solid var(--yellow); }
 .msg { color: var(--red); min-height: 1.2em; margin: 10px 0 0; text-align: center; }
+.misses { color: var(--muted); font-size: 14px; margin: 6px 0 0; text-align: center; }
+.shake { animation: shake 0.35s; border-color: var(--red) !important; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
 .reveal { text-align: center; }
 .badge { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 800; border: 2px solid var(--ink); }

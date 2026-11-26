@@ -193,9 +193,9 @@ function home() {
         <summary>How to play</summary>
         <ol>
           <li>Every day, everyone gets the same seven prompts, like “Name a Tour de France climb”.</li>
-          <li>You get ${SECONDS} seconds per prompt to type one answer. Small typos are fine.</li>
+          <li>You get ${SECONDS} seconds per prompt. Wrong guesses are just a <b>puncture</b>: patch up and keep trying until the clock runs out. Small typos are fine.</li>
           <li>Common answers barely move you. Rare-but-real ones send you up the mountain: ${METRES_PER_POINT} m per point.</li>
-          <li>Answers we don't recognise are a <b>puncture</b> (0 m). Running out of time is a <b>bonk</b>.</li>
+          <li>Your first correct answer locks in. Running out of time is a <b>bonk</b> (0 m).</li>
         </ol>
         <ul class="tiers">${TIERS.map((t) => `<li><span class="sw" style="background:${t.color}"></span>${t.name}<em>${t.points} pts</em></li>`).join("")}</ul>
         <p class="fine">Rarity tiers are our own editorial guesses, not live player stats.</p>
@@ -256,25 +256,38 @@ function question() {
           <button class="btn ghost" type="button" id="pass">Pass</button>
         </div>
         <p class="msg" id="msg"></p>
+        <p class="misses" id="misses"></p>
       </form>
     </section>`;
   bindHome();
   const input = document.getElementById("answer");
   input.focus();
+  const misses = [];
+  const msg = document.getElementById("msg");
   document.getElementById("form").onsubmit = (e) => {
     e.preventDefault();
     const v = input.value.trim();
     if (!v) return;
     const m = matchAnswer(indexFor(p), v);
     if (m && m.ambiguous) {
-      document.getElementById("msg").textContent = "More than one rider has that surname: add a first name.";
+      msg.textContent = "More than one rider has that surname: add a first name.";
       input.select();
       return;
     }
-    answer(p, v, m, m ? "ok" : "puncture");
+    if (!m) {
+      misses.push(v);
+      msg.textContent = `Puncture! “${v}” isn't on our list. Keep trying.`;
+      document.getElementById("misses").innerHTML = misses.map((x) => `<s>${esc(x)}</s>`).join(" · ");
+      input.value = "";
+      input.classList.remove("shake");
+      void input.offsetWidth;
+      input.classList.add("shake");
+      return;
+    }
+    answer(p, v, m, "ok", misses);
   };
-  document.getElementById("pass").onclick = () => answer(p, "", null, "pass");
-  startTimer(() => answer(p, input.value.trim(), null, "bonk"));
+  document.getElementById("pass").onclick = () => answer(p, "", null, "pass", misses);
+  startTimer(() => answer(p, "", null, "bonk", misses));
 }
 
 function startTimer(onEnd) {
@@ -299,10 +312,10 @@ function stopTimer() {
   timer = null;
 }
 
-function answer(p, input, m, reason) {
+function answer(p, input, m, reason, misses = []) {
   stopTimer();
   const tier = m ? m.tier : -1;
-  state.results.push({ id: p.id, input, display: m ? m.display : null, tier, points: m ? TIERS[tier].points : 0, reason });
+  state.results.push({ id: p.id, input, display: m ? m.display : null, tier, points: m ? TIERS[tier].points : 0, reason, misses });
   reveal(p);
 }
 
@@ -321,13 +334,10 @@ function reveal(p) {
       <p class="gain">+${t.points} pts · <b>+${fmt(t.points * METRES_PER_POINT)} m</b></p>
       ${note ? `<p class="note">${esc(note)}</p>` : ""}`;
   } else {
-    const title = { puncture: "Puncture!", bonk: "Bonk!", pass: "Soft-pedalled" }[r.reason];
-    const why = {
-      puncture: `We don't have “${esc(r.input)}” on our list for this one.`,
-      bonk: "Out of time.",
-      pass: "You let this one go.",
-    }[r.reason];
-    body = `<div class="badge none">No points</div><h2 class="answer">${title}</h2><p class="gain">${why}</p>`;
+    const title = { bonk: "Bonk!", pass: "Soft-pedalled" }[r.reason];
+    const why = { bonk: "Out of time.", pass: "You let this one go." }[r.reason];
+    const tries = r.misses && r.misses.length ? `<p class="misses">Punctures: ${r.misses.map((x) => `<s>${esc(x)}</s>`).join(" · ")}</p>` : "";
+    body = `<div class="badge none">No points</div><h2 class="answer">${title}</h2><p class="gain">${why}</p>${tries}`;
   }
   const rarer = p.tiers.slice(Math.max(r.tier + 1, 3)).flat();
   const examples = shuffle(rarer, Math.random).slice(0, 3).map((a) => a.split("|")[0]);
@@ -372,7 +382,7 @@ function finish(st) {
         .reverse()
         .join("");
       return `<details class="res">
-        <summary><span class="sw" style="background:${t ? t.color : "#333"}"></span><span class="q">${esc(p.q)}</span><span class="a">${t ? esc(r.display) : r.reason === "puncture" ? `<s>${esc(r.input)}</s>` : "—"}</span><span class="p">${t ? `+${fmt(t.points * METRES_PER_POINT)} m` : "0 m"}</span></summary>
+        <summary><span class="sw" style="background:${t ? t.color : "#333"}"></span><span class="q">${esc(p.q)}</span><span class="a">${t ? esc(r.display) : r.misses && r.misses.length ? `<s>${esc(r.misses[r.misses.length - 1])}</s>` : "—"}</span><span class="p">${t ? `+${fmt(t.points * METRES_PER_POINT)} m` : "0 m"}</span></summary>
         <div class="all">${all}</div>
       </details>`;
     })
