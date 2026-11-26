@@ -315,7 +315,7 @@ function stopTimer() {
 function answer(p, input, m, reason, misses = []) {
   stopTimer();
   const tier = m ? m.tier : -1;
-  state.results.push({ id: p.id, input, display: m ? m.display : null, tier, points: m ? TIERS[tier].points : 0, reason, misses });
+  state.results.push({ id: p.id, input, display: m ? m.display : null, tier, points: m ? TIERS[tier].points : 0, reason, misses, corrected: !!(m && m.corrected) });
   reveal(p);
 }
 
@@ -331,6 +331,7 @@ function reveal(p) {
     body = `
       <div class="badge" style="background:${t.color}">${t.name}</div>
       <h2 class="answer">${esc(r.display)}</h2>
+      ${r.corrected ? `<p class="misses">Autocorrected from “${esc(r.input)}”</p>` : ""}
       <p class="gain">+${t.points} pts · <b>+${fmt(t.points * METRES_PER_POINT)} m</b></p>
       ${note ? `<p class="note">${esc(note)}</p>` : ""}`;
   } else {

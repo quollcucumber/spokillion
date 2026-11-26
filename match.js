@@ -13,7 +13,7 @@ export function normalize(s) {
 }
 
 function levenshtein(a, b) {
-  if (Math.abs(a.length - b.length) > 3) return 99;
+  if (Math.abs(a.length - b.length) > 4) return 99;
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
   for (let j = 1; j <= b.length; j++) d[0][j] = j;
   for (let i = 1; i <= a.length; i++) {
@@ -24,6 +24,11 @@ function levenshtein(a, b) {
     }
   }
   return d[a.length][b.length];
+}
+
+// Sound-alike spelling folded away so e.g. "Pogachar", "Merx" or "Cipollini" score closer.
+function loose(s) {
+  return s.replace(/ph/g, "f").replace(/ck|q/g, "k").replace(/ch/g, "c").replace(/y/g, "i").replace(/[wv]/g, "v").replace(/z/g, "s").replace(/x/g, "ks").replace(/([^aeiou])\1+/g, "$1");
 }
 
 function surnameKeys(display) {
@@ -74,16 +79,23 @@ export function matchAnswer(index, input) {
   if (index.map.has(key)) return index.map.get(key);
   if (index.ambiguous.has(key)) return { ambiguous: true };
   if (key.length < 4 || /^\d+$/.test(key)) return null;
-  const allowed = key.length <= 7 ? 1 : key.length <= 12 ? 2 : 3;
+  const lkey = loose(key);
   let best = null;
-  let bestD = allowed + 1;
-  for (const [k, e] of index.map) {
-    if (k.length < 4) continue;
-    const d = levenshtein(key, k);
-    if (d < bestD) {
+  let bestD = 99;
+  const consider = (k, e) => {
+    if (k.length < 4 || k[0] !== key[0]) return;
+    const L = Math.min(key.length, k.length);
+    const allowed = L < 5 ? 0 : L <= 7 ? 1 : L <= 11 ? 2 : 3;
+    const d = Math.min(levenshtein(key, k), levenshtein(lkey, loose(k)));
+    if (d <= allowed && d < bestD) {
       bestD = d;
       best = e;
     }
-  }
-  return best;
+  };
+  for (const [k, e] of index.map) consider(k, e);
+  for (const k of index.ambiguous) consider(k, AMBIGUOUS);
+  if (!best || best === AMBIGUOUS) return best && { ambiguous: true };
+  return { ...best, corrected: true };
 }
+
+const AMBIGUOUS = {};
